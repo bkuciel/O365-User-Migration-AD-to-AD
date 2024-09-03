@@ -1,7 +1,6 @@
 # Copyright Bartosz Kuciel
 # Script used to "migrate" user - AD to AD within one Tennant - detach AD User in Domain A from O365 user, and attach user from domain B to O365 account
 # Function "ConvertTo-ImmutableID" is a part of PSSharedGoods module created by - Evotec on MIT License https://github.com/EvotecIT/PSSharedGoods
-# "region Enable-RemoteMailbox" is an optional step for creating remote mailbox on Exchange server in domain B pointing to O365 user
 # "region connection" uses Export-CliXml / Import-CliXml to securely save and load credentials. See: https://github.com/bkuciel/Powershell_Scripts/blob/main/Code/Export-Clixml_multiple_credentials.ps1
 
 [CmdletBinding()] param ()
@@ -179,45 +178,5 @@ Invoke-Command -ComputerName ADConnect.domainB.local -ScriptBlock {Start-ADSyncS
 Write-Host "Second Sync Started.." -ForegroundColor Green
 Start-Countdown -Seconds 60 -Message "Waiting for results of sync"
 Write-Host "Done" -ForegroundColor Green
-
-
-#region Enable-RemoteMailbox
-#[Exchange] Enable-RemoteMailbox
-Write-host "Enabling EXCH Remote Mailbox" -ForegroundColor Yellow
-if ($null -eq $creds.DOM)
-{
-    $creds.DOM = Get-Credential -Message 'DOM Credentials'
-}
-try {
-    $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri http://Exchange1.domainB.local/PowerShell/ -Authentication Kerberos -Credential $Creds.DOM
-    Import-PSSession $Session -DisableNameChecking
-}
-catch {
-    $message = $_
-    Write-Warning -Message "Problem with connecting to Exchange1.domainB.local: $message"
-    break
-}
-
-
-$EXO_user= $processed_user.SamAccountName
-$EXO_extmail= $processed_user.mail
-try 
-{
-    Enable-RemoteMailbox "$EXO_user" -RemoteRoutingAddress $EXO_extmail | Out-Null
-    Write-Host "RemoteMailbox enabled" -ForegroundColor Green
-}
-catch
-{
-    $message = $_
-    Write-Warning -Message "Enabling Remote Mailbox failed: $message"
-}
-
-#Verification: 
-Write-Host "Verification" -ForegroundColor Yellow
-Get-Recipient $EXO_user | select  Name, Recipienttype, RecipientTypeDetails
-
-#Disconnect
-Remove-PSSession $Session
-#endregion
 
 Write-Host "Migration done" -ForegroundColor Green
